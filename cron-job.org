@@ -1,0 +1,3 @@
+@app.route('/keep_alive')
+def keep_alive():
+    return "Bot is alive!", 200
