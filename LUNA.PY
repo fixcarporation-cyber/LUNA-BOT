@@ -116,7 +116,7 @@ async def on_message(message):
     msg_lower = message.content.lower()
     
     # UPDATED RESPONSES DICTIONARY with "I am fine" responses
-  responses = {
+responses = {
     'hello': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
     'hi': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
     'bye': ['Goodbye! 👋', 'See you later!', 'Take care! 😊'],
