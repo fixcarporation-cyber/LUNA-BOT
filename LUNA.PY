@@ -255,5 +255,6 @@ if __name__ == "__main__":
         print("❌ Error: DISCORD_TOKEN environment variable not found!")
         print("📝 Please set DISCORD_TOKEN in Render dashboard → Environment tab")
     else:
+        keep_alive()
         print("🚀 Starting bot...")
         bot.run(TOKEN)
