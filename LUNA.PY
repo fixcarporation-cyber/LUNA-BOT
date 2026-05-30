@@ -27,21 +27,41 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # ========== CONFIGURATION ==========
-# PUT YOUR DISCORD USER ID HERE (Right-click your name → Copy User ID)
-OWNER_USER_ID = 1232243863423418432  # ⚠️ REPLACE THIS WITH YOUR ACTUAL USER ID!
+OWNER_ROLE_NAME = "owner"
 
 def is_owner():
-    """Check if user is the bot owner by user ID"""
     async def predicate(ctx):
-        if ctx.author.id != OWNER_USER_ID:
-            await ctx.send(f"❌ You don't have permission! Only the bot owner can use this command.")
+        role = discord.utils.get(ctx.author.roles, name=OWNER_ROLE_NAME)
+        if role is None:
+            await ctx.send(f"❌ You don't have permission! You need the **{OWNER_ROLE_NAME}** role to use this command.")
             return False
         return True
     return commands.check(predicate)
 
 def check_owner_role(member):
-    """Returns True if member is the bot owner"""
-    return member.id == OWNER_USER_ID
+    return any(role.name == OWNER_ROLE_NAME for role in member.roles)
+
+# Helper function to find member by username/nickname
+async def find_member(ctx, user_input):
+    """Find a member by mention, username, or nickname"""
+    # Check if it's a mention
+    if len(ctx.message.mentions) > 0:
+        return ctx.message.mentions[0]
+    
+    # Clean up input (remove extra spaces)
+    search_name = user_input.strip().lower()
+    
+    # Try exact match first
+    for member in ctx.guild.members:
+        if member.name.lower() == search_name or (member.nick and member.nick.lower() == search_name):
+            return member
+    
+    # Try partial match (contains)
+    for member in ctx.guild.members:
+        if search_name in member.name.lower() or (member.nick and search_name in member.nick.lower()):
+            return member
+    
+    return None
 
 # ========== YOUTUBE FUNCTIONS ==========
 async def process_youtube_channel(url):
@@ -125,35 +145,130 @@ async def on_message(message):
     
     await bot.process_commands(message)
 
-# ========== MODERATION COMMANDS (OWNER ONLY BY USER ID) ==========
+# ========== MODERATION COMMANDS (OWNER ONLY) ==========
 @bot.command(name='timeout')
 @is_owner()
-async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, reason: str = "No reason provided"):
+async def timeout_member(ctx, *, args: str = None):
+    """Timeout a member. Usage: !timeout @user OR !timeout username OR !timeout username minutes reason"""
+    
+    if args is None:
+        await ctx.send("❌ Please specify a user! Example: `!timeout @user 5 reason` or `!timeout username 5 reason`")
+        return
+    
+    parts = args.split()
+    user_input = parts[0]
+    
+    # Parse duration and reason
+    duration = 60  # default
+    reason_start = 1
+    
+    if len(parts) > 1 and parts[1].isdigit():
+        duration = int(parts[1])
+        reason_start = 2
+    
+    reason = " ".join(parts[reason_start:]) if len(parts) > reason_start else "No reason provided"
+    
+    # Find member
+    member = None
+    
+    # Check if it's a mention
+    if len(ctx.message.mentions) > 0:
+        member = ctx.message.mentions[0]
+    else:
+        # Search by username or nickname
+        search_name = user_input.lower()
+        for m in ctx.guild.members:
+            if m.name.lower() == search_name or (m.nick and m.nick.lower() == search_name):
+                member = m
+                break
+        
+        # If not found, try partial match
+        if member is None:
+            for m in ctx.guild.members:
+                if search_name in m.name.lower() or (m.nick and search_name in m.nick.lower()):
+                    member = m
+                    break
+    
+    if member is None:
+        await ctx.send(f"❌ Could not find user: {user_input}")
+        return
+    
     try:
         timeout_duration = timedelta(minutes=duration)
         await member.timeout(timeout_duration, reason=reason)
-        embed = discord.Embed(title="⏰ Member Timed Out", description=f"{member.mention} has been timed out!", color=discord.Color.orange())
+        
+        embed = discord.Embed(
+            title="⏰ Member Timed Out",
+            description=f"{member.mention} has been timed out!",
+            color=discord.Color.orange()
+        )
         embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
         embed.add_field(name="Reason", value=reason, inline=True)
+        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
         await ctx.send(embed=embed)
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to timeout this member!")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
 
 @bot.command(name='untimeout')
 @is_owner()
-async def untimeout_member(ctx, member: discord.Member):
+async def untimeout_member(ctx, *, user_input: str):
+    """Remove timeout from a member. Usage: !untimeout @user OR !untimeout username"""
+    
+    # Find member
+    member = None
+    
+    if len(ctx.message.mentions) > 0:
+        member = ctx.message.mentions[0]
+    else:
+        search_name = user_input.lower()
+        for m in ctx.guild.members:
+            if m.name.lower() == search_name or (m.nick and m.nick.lower() == search_name):
+                member = m
+                break
+    
+    if member is None:
+        await ctx.send(f"❌ Could not find user: {user_input}")
+        return
+    
     try:
         await member.timeout(None)
         await ctx.send(f"✅ {member.mention} timeout has been removed!")
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to remove timeout!")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
 
 @bot.command(name='kick')
 @is_owner()
-async def kick_member(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+async def kick_member(ctx, *, args: str):
+    """Kick a member. Usage: !kick @user OR !kick username reason"""
+    
+    parts = args.split()
+    user_input = parts[0]
+    reason = " ".join(parts[1:]) if len(parts) > 1 else "No reason provided"
+    
+    # Find member
+    member = None
+    
+    if len(ctx.message.mentions) > 0:
+        member = ctx.message.mentions[0]
+    else:
+        search_name = user_input.lower()
+        for m in ctx.guild.members:
+            if m.name.lower() == search_name or (m.nick and m.nick.lower() == search_name):
+                member = m
+                break
+    
+    if member is None:
+        await ctx.send(f"❌ Could not find user: {user_input}")
+        return
+    
     if member == ctx.author:
         await ctx.send("❌ You cannot kick yourself!")
         return
+    
     try:
         await member.kick(reason=reason)
         await ctx.send(f"✅ {member.mention} has been kicked!\nReason: {reason}")
@@ -162,10 +277,33 @@ async def kick_member(ctx, member: discord.Member, *, reason: str = "No reason p
 
 @bot.command(name='ban')
 @is_owner()
-async def ban_member(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+async def ban_member(ctx, *, args: str):
+    """Ban a member. Usage: !ban @user OR !ban username reason"""
+    
+    parts = args.split()
+    user_input = parts[0]
+    reason = " ".join(parts[1:]) if len(parts) > 1 else "No reason provided"
+    
+    # Find member
+    member = None
+    
+    if len(ctx.message.mentions) > 0:
+        member = ctx.message.mentions[0]
+    else:
+        search_name = user_input.lower()
+        for m in ctx.guild.members:
+            if m.name.lower() == search_name or (m.nick and m.nick.lower() == search_name):
+                member = m
+                break
+    
+    if member is None:
+        await ctx.send(f"❌ Could not find user: {user_input}")
+        return
+    
     if member == ctx.author:
         await ctx.send("❌ You cannot ban yourself!")
         return
+    
     try:
         await member.ban(reason=reason)
         await ctx.send(f"✅ {member.mention} has been banned!\nReason: {reason}")
@@ -180,7 +318,7 @@ async def unban_member(ctx, *, member_name):
         member_name_split = member_name.split('#')
         for ban_entry in banned_users:
             user = ban_entry.user
-            if user.name == member_name_split[0]:
+            if user.name.lower() == member_name_split[0].lower():
                 await ctx.guild.unban(user)
                 await ctx.send(f"✅ Unbanned {user.mention}")
                 return
@@ -208,14 +346,14 @@ async def ping(ctx):
 
 @bot.command(name='admin')
 async def admin_commands(ctx):
-    if ctx.author.id != OWNER_USER_ID:
-        await ctx.send(f"❌ Only the bot owner can view admin commands!")
+    if not check_owner_role(ctx.author):
+        await ctx.send(f"❌ You need the **{OWNER_ROLE_NAME}** role to view admin commands!")
         return
     embed = discord.Embed(title="🔒 Owner Commands", color=discord.Color.dark_red())
-    embed.add_field(name="!timeout @user [min] [reason]", value="Timeout a member", inline=False)
-    embed.add_field(name="!untimeout @user", value="Remove timeout", inline=False)
-    embed.add_field(name="!kick @user [reason]", value="Kick a member", inline=False)
-    embed.add_field(name="!ban @user [reason]", value="Ban a member", inline=False)
+    embed.add_field(name="!timeout @user/username [min] [reason]", value="Timeout a member", inline=False)
+    embed.add_field(name="!untimeout @user/username", value="Remove timeout", inline=False)
+    embed.add_field(name="!kick @user/username [reason]", value="Kick a member", inline=False)
+    embed.add_field(name="!ban @user/username [reason]", value="Ban a member", inline=False)
     embed.add_field(name="!unban username#1234", value="Unban a member", inline=False)
     embed.add_field(name="!clear [amount]", value="Delete messages", inline=False)
     await ctx.send(embed=embed)
@@ -234,11 +372,9 @@ async def show_commands(ctx):
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing argument! Example: `!{ctx.command.name} @user`")
+        await ctx.send(f"❌ Missing argument!")
     elif isinstance(error, commands.CommandNotFound):
         pass
-    elif isinstance(error, commands.MemberNotFound):
-        await ctx.send("❌ Member not found! Please mention a valid user.")
     else:
         await ctx.send(f"❌ Error: {str(error)}")
 
@@ -247,7 +383,6 @@ async def on_command_error(ctx, error):
 async def on_ready():
     print(f'✅ {bot.user} is online!')
     print(f'📊 Bot is in {len(bot.guilds)} guilds')
-    print(f'👑 Bot owner user ID: {OWNER_USER_ID}')
     await bot.change_presence(activity=discord.Game(name="Type 'Luna' for YouTube link!"))
 
 # ========== RUN BOT ==========
