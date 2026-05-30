@@ -6,8 +6,24 @@ from datetime import datetime, timedelta
 import os
 import re
 import aiohttp
+from flask import Flask
+from threading import Thread
 
-# Bot setup with command prefix
+# Flask web server for Render
+app = Flask('')
+
+@app.route('/')
+def home():
+    return "✅ Luna Bot is alive and running!"
+
+def run():
+    app.run(host='0.0.0.0', port=8080)
+
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
+
+# Bot setup
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -15,11 +31,9 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # ========== CONFIGURATION ==========
-# Role name must match EXACTLY - yours is "owner" (lowercase)
 OWNER_ROLE_NAME = "owner"
 
 def is_owner():
-    """Check if user has owner role"""
     async def predicate(ctx):
         role = discord.utils.get(ctx.author.roles, name=OWNER_ROLE_NAME)
         if role is None:
@@ -29,7 +43,6 @@ def is_owner():
     return commands.check(predicate)
 
 def check_owner_role(member):
-    """Returns True if member has owner role"""
     return any(role.name == OWNER_ROLE_NAME for role in member.roles)
 
 # ========== YOUTUBE FUNCTIONS ==========
@@ -39,7 +52,6 @@ async def process_youtube_channel(url):
         r'(?:https?://)?(?:www\.)?youtube\.com/channel/([a-zA-Z0-9_-]+)',
         r'(?:https?://)?(?:www\.)?youtube\.com/c/([a-zA-Z0-9_-]+)'
     ]
-    
     for pattern in channel_patterns:
         match = re.search(pattern, url)
         if match:
@@ -59,7 +71,6 @@ async def shorten_youtube_link(url):
         r'(?:https?://)?(?:www\.)?youtu\.be/([a-zA-Z0-9_-]+)',
         r'(?:https?://)?(?:www\.)?youtube\.com/shorts/([a-zA-Z0-9_-]+)'
     ]
-    
     for pattern in video_patterns:
         match = re.search(pattern, url)
         if match:
@@ -79,18 +90,16 @@ async def send_subscribe_embed(channel, channel_handle="@FIXCORPORATION"):
     embed.set_footer(text="Subscribe, like, and stay tuned for more!")
     await channel.send(embed=embed)
 
-# ========== MAIN ON_MESSAGE EVENT ==========
+# ========== MAIN ON_MESSAGE ==========
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
     
-    # "Luna" trigger
     if 'luna' in message.content.lower():
         await send_subscribe_embed(message.channel, "@FIXCORPORATION")
         return
     
-    # YouTube link shortening
     youtube_pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+'
     youtube_links = re.findall(youtube_pattern, message.content)
     
@@ -103,7 +112,6 @@ async def on_message(message):
                 color=discord.Color.purple()
             )
             embed.add_field(name="💡 Tip", value="Subscribe to support the channel!", inline=False)
-            embed.set_footer(text="Channel link processed successfully!")
             await message.channel.send(embed=embed)
             break
         
@@ -119,32 +127,19 @@ async def on_message(message):
     
     await bot.process_commands(message)
 
-# ========== MODERATION COMMANDS (OWNER ROLE ONLY) ==========
+# ========== MODERATION COMMANDS ==========
 @bot.command(name='timeout')
 @is_owner()
 async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, reason: str = "No reason provided"):
     try:
         timeout_duration = timedelta(minutes=duration)
         await member.timeout(timeout_duration, reason=reason)
-        
-        embed = discord.Embed(
-            title="⏰ Member Timed Out",
-            description=f"{member.mention} has been timed out!",
-            color=discord.Color.orange()
-        )
+        embed = discord.Embed(title="⏰ Member Timed Out", description=f"{member.mention} has been timed out!", color=discord.Color.orange())
         embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
         embed.add_field(name="Reason", value=reason, inline=True)
-        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
         await ctx.send(embed=embed)
-        
-        try:
-            await member.send(f"⚠️ You have been timed out in **{ctx.guild.name}** for {duration} minutes.\nReason: {reason}")
-        except:
-            pass
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to timeout this member!")
-    except Exception as e:
-        await ctx.send(f"❌ Error: {str(e)}")
 
 @bot.command(name='untimeout')
 @is_owner()
@@ -153,9 +148,7 @@ async def untimeout_member(ctx, member: discord.Member):
         await member.timeout(None)
         await ctx.send(f"✅ {member.mention} timeout has been removed!")
     except discord.Forbidden:
-        await ctx.send("❌ I don't have permission to remove timeout from this member!")
-    except Exception as e:
-        await ctx.send(f"❌ Error: {str(e)}")
+        await ctx.send("❌ I don't have permission to remove timeout!")
 
 @bot.command(name='kick')
 @is_owner()
@@ -163,23 +156,9 @@ async def kick_member(ctx, member: discord.Member, *, reason: str = "No reason p
     if member == ctx.author:
         await ctx.send("❌ You cannot kick yourself!")
         return
-    if member.guild_permissions.administrator:
-        await ctx.send("❌ You cannot kick an administrator!")
-        return
     try:
-        embed = discord.Embed(
-            title="👢 Member Kicked",
-            description=f"{member.mention} has been kicked!",
-            color=discord.Color.red()
-        )
-        embed.add_field(name="Reason", value=reason, inline=True)
-        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
         await member.kick(reason=reason)
-        await ctx.send(embed=embed)
-        try:
-            await member.send(f"⚠️ You have been kicked from **{ctx.guild.name}**.\nReason: {reason}")
-        except:
-            pass
+        await ctx.send(f"✅ {member.mention} has been kicked!\nReason: {reason}")
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to kick this member!")
 
@@ -189,19 +168,9 @@ async def ban_member(ctx, member: discord.Member, *, reason: str = "No reason pr
     if member == ctx.author:
         await ctx.send("❌ You cannot ban yourself!")
         return
-    if member.guild_permissions.administrator:
-        await ctx.send("❌ You cannot ban an administrator!")
-        return
     try:
-        embed = discord.Embed(
-            title="🔨 Member Banned",
-            description=f"{member.mention} has been banned!",
-            color=discord.Color.dark_red()
-        )
-        embed.add_field(name="Reason", value=reason, inline=True)
-        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
         await member.ban(reason=reason)
-        await ctx.send(embed=embed)
+        await ctx.send(f"✅ {member.mention} has been banned!\nReason: {reason}")
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to ban this member!")
 
@@ -213,7 +182,7 @@ async def unban_member(ctx, *, member_name):
         member_name_split = member_name.split('#')
         for ban_entry in banned_users:
             user = ban_entry.user
-            if user.name == member_name_split[0] and (len(member_name_split) == 1 or user.discriminator == member_name_split[1]):
+            if user.name == member_name_split[0]:
                 await ctx.guild.unban(user)
                 await ctx.send(f"✅ Unbanned {user.mention}")
                 return
@@ -229,30 +198,6 @@ async def clear(ctx, amount=5):
     await ctx.channel.purge(limit=amount + 1)
     await ctx.send(f'✅ Deleted {amount} messages!', delete_after=3)
 
-# ========== ADMIN HELP ==========
-@bot.command(name='admin')
-async def admin_commands(ctx):
-    if not check_owner_role(ctx.author):
-        await ctx.send(f"❌ You need the **{OWNER_ROLE_NAME}** role to view admin commands!")
-        return
-    embed = discord.Embed(
-        title="🔒 Owner Commands",
-        description=f"These commands are only available to users with the **{OWNER_ROLE_NAME}** role.",
-        color=discord.Color.dark_red()
-    )
-    admin_commands_list = {
-        "!timeout @user [min] [reason]": "Timeout a member",
-        "!untimeout @user": "Remove timeout",
-        "!kick @user [reason]": "Kick a member",
-        "!ban @user [reason]": "Ban a member",
-        "!unban username#1234": "Unban a member",
-        "!clear [amount]": "Delete messages"
-    }
-    for cmd, desc in admin_commands_list.items():
-        embed.add_field(name=cmd, value=desc, inline=False)
-    embed.set_footer(text="Use these commands responsibly!")
-    await ctx.send(embed=embed)
-
 # ========== REGULAR COMMANDS ==========
 @bot.command(name='subscribe')
 async def subscribe_reminder(ctx):
@@ -263,32 +208,39 @@ async def ping(ctx):
     latency = round(bot.latency * 1000)
     await ctx.send(f'🏓 Pong! Latency: {latency}ms')
 
+@bot.command(name='admin')
+async def admin_commands(ctx):
+    if not check_owner_role(ctx.author):
+        await ctx.send(f"❌ You need the **{OWNER_ROLE_NAME}** role to view admin commands!")
+        return
+    embed = discord.Embed(title="🔒 Owner Commands", color=discord.Color.dark_red())
+    embed.add_field(name="!timeout @user [min] [reason]", value="Timeout a member", inline=False)
+    embed.add_field(name="!untimeout @user", value="Remove timeout", inline=False)
+    embed.add_field(name="!kick @user [reason]", value="Kick a member", inline=False)
+    embed.add_field(name="!ban @user [reason]", value="Ban a member", inline=False)
+    embed.add_field(name="!unban username#1234", value="Unban a member", inline=False)
+    embed.add_field(name="!clear [amount]", value="Delete messages", inline=False)
+    await ctx.send(embed=embed)
+
 @bot.command(name='commands')
 async def show_commands(ctx):
-    embed = discord.Embed(title="📋 Available Commands", description="Here's what I can do!", color=discord.Color.green())
-    commands_list = {
-        "!ping": "Check bot latency",
-        "!subscribe": "Get FIX CORPORATION YouTube link",
-        "!admin": "Show owner commands (owner role only)",
-        "!commands": "Show this help menu"
-    }
-    for cmd, desc in commands_list.items():
-        embed.add_field(name=cmd, value=desc, inline=False)
+    embed = discord.Embed(title="📋 Available Commands", color=discord.Color.green())
+    embed.add_field(name="!ping", value="Check bot latency", inline=False)
+    embed.add_field(name="!subscribe", value="Get FIX CORPORATION YouTube link", inline=False)
+    embed.add_field(name="!admin", value="Show owner commands", inline=False)
+    embed.add_field(name="!commands", value="Show this help menu", inline=False)
     embed.add_field(name="🎬 Auto Features", value="• Type 'Luna' anywhere to get subscribe link!\n• Automatically shortens YouTube links", inline=False)
-    embed.set_footer(text="Made for FIX CORPORATION")
     await ctx.send(embed=embed)
 
 # ========== ERROR HANDLING ==========
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-        await ctx.send("❌ You don't have permission to use this command!")
-    elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing argument!")
+    if isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing argument! Example: `!{ctx.command.name} @user`")
     elif isinstance(error, commands.CommandNotFound):
         pass
     elif isinstance(error, commands.MemberNotFound):
-        await ctx.send("❌ Member not found!")
+        await ctx.send("❌ Member not found! Please mention a valid user.")
     else:
         await ctx.send(f"❌ Error: {str(error)}")
 
@@ -304,7 +256,7 @@ if __name__ == "__main__":
     TOKEN = os.getenv('DISCORD_TOKEN')
     if not TOKEN:
         print("❌ Error: DISCORD_TOKEN environment variable not found!")
-        print("📝 Please set DISCORD_TOKEN in Render dashboard → Environment tab")
     else:
+        keep_alive()  # Start web server for Render
         print("🚀 Starting bot...")
         bot.run(TOKEN)
