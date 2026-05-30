@@ -57,11 +57,31 @@ async def shorten_youtube_link(url):
     
     return None
 
+# Function to send subscribe embed (reused for both !subscribe and "Luna" trigger)
+async def send_subscribe_embed(channel, channel_handle="@FIXCORPORATION"):
+    """Send the subscribe embed message"""
+    embed = discord.Embed(
+        title="🎯 Don't Forget to Subscribe!",
+        description=f"Check out **{channel_handle}** on YouTube!",
+        color=discord.Color.gold()
+    )
+    embed.add_field(name="📺 Channel Link", value=f"https://youtube.com/{channel_handle}", inline=False)
+    embed.add_field(name="🎁 What You Get", value="• Free Aimbot panel\n• 100% Safe\n• Regular updates", inline=False)
+    embed.add_field(name="📊 Current Stats", value="95 subscribers • 15 videos", inline=True)
+    embed.set_footer(text="Subscribe, like, and stay tuned for more!")
+    
+    await channel.send(embed=embed)
+
 # Main on_message event with channel support
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
         return
+    
+    # ✅ NEW: Check for "Luna" in message (case insensitive)
+    if 'luna' in message.content.lower():
+        await send_subscribe_embed(message.channel, "@FIXCORPORATION")
+        return  # Stop here so it doesn't process other responses
     
     # Check for YouTube links
     youtube_pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+'
@@ -120,7 +140,7 @@ async def on_message(message):
     
     await bot.process_commands(message)
 
-# New command: Get channel info
+# Command: Get channel info
 @bot.command(name='channel')
 async def channel_info(ctx, *, handle_or_url):
     """Get information about a YouTube channel"""
@@ -148,17 +168,7 @@ async def subscribe_reminder(ctx, channel_handle=None):
     if not channel_handle:
         channel_handle = "@FIXCORPORATION"
     
-    embed = discord.Embed(
-        title="🎯 Don't Forget to Subscribe!",
-        description=f"Check out **{channel_handle}** on YouTube!",
-        color=discord.Color.gold()
-    )
-    embed.add_field(name="📺 Channel Link", value=f"https://youtube.com/{channel_handle}", inline=False)
-    embed.add_field(name="🎁 What You Get", value="• Free Aimbot panel\n• 100% Safe\n• Regular updates", inline=False)
-    embed.add_field(name="📊 Current Stats", value="95 subscribers • 15 videos", inline=True)
-    embed.set_footer(text="Subscribe, like, and stay tuned for more!")
-    
-    await ctx.send(embed=embed)
+    await send_subscribe_embed(ctx.channel, channel_handle)
 
 # Command: Promote your channel
 @bot.command(name='promote')
@@ -208,6 +218,113 @@ async def youtube_info(ctx, *, url):
     embed.add_field(name="💡 Tip", value="Check out FIX CORPORATION for more content!", inline=False)
     await ctx.send(embed=embed)
 
+# Command: Ping - Check bot latency
+@bot.command(name='ping')
+async def ping(ctx):
+    latency = round(bot.latency * 1000)
+    await ctx.send(f'🏓 Pong! Latency: {latency}ms')
+
+# Command: Echo - Repeat user message
+@bot.command(name='echo')
+async def echo(ctx, *, message):
+    await ctx.send(message)
+
+# Command: Clear messages (admin only)
+@bot.command(name='clear')
+@commands.has_permissions(manage_messages=True)
+async def clear(ctx, amount=5):
+    if amount > 100:
+        amount = 100
+    await ctx.channel.purge(limit=amount + 1)
+    await ctx.send(f'✅ Deleted {amount} messages!', delete_after=3)
+
+# Command: User info
+@bot.command(name='userinfo')
+async def userinfo(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    
+    embed = discord.Embed(
+        title=f"User Info: {member.name}",
+        color=member.color,
+        timestamp=datetime.now()
+    )
+    
+    embed.add_field(name="ID", value=member.id, inline=True)
+    embed.add_field(name="Joined Discord", value=member.created_at.strftime("%Y-%m-%d"), inline=True)
+    embed.add_field(name="Joined Server", value=member.joined_at.strftime("%Y-%m-%d"), inline=True)
+    embed.add_field(name="Top Role", value=member.top_role.mention, inline=True)
+    embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
+    
+    await ctx.send(embed=embed)
+
+# Command: Random number generator
+@bot.command(name='roll')
+async def roll(ctx, dice: str = "1d6"):
+    try:
+        rolls, limit = map(int, dice.split('d'))
+        if rolls > 100:
+            await ctx.send("❌ Too many rolls! Maximum is 100.")
+            return
+        if limit > 1000:
+            await ctx.send("❌ Dice too big! Maximum is 1000.")
+            return
+            
+        results = [random.randint(1, limit) for _ in range(rolls)]
+        total = sum(results)
+        
+        if rolls == 1:
+            await ctx.send(f"🎲 You rolled: **{total}**")
+        else:
+            await ctx.send(f"🎲 Rolls: {results}\nTotal: **{total}**")
+    except:
+        await ctx.send("❌ Invalid format! Use: `!roll 2d20`")
+
+# Command: Server info
+@bot.command(name='serverinfo')
+async def serverinfo(ctx):
+    guild = ctx.guild
+    
+    embed = discord.Embed(
+        title=f"Server Info: {guild.name}",
+        color=discord.Color.blue(),
+        timestamp=datetime.now()
+    )
+    
+    embed.add_field(name="Owner", value=guild.owner.mention, inline=True)
+    embed.add_field(name="Members", value=guild.member_count, inline=True)
+    embed.add_field(name="Channels", value=len(guild.channels), inline=True)
+    embed.add_field(name="Roles", value=len(guild.roles), inline=True)
+    embed.add_field(name="Created On", value=guild.created_at.strftime("%Y-%m-%d"), inline=True)
+    
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+    
+    await ctx.send(embed=embed)
+
+# Command: 8ball - Ask a question
+@bot.command(name='8ball')
+async def eight_ball(ctx, *, question):
+    responses = [
+        "Yes! 🎯", "No ❌", "Maybe 🤔", "Definitely! ✅", 
+        "Ask again later 🔮", "Not likely ❎", "Of course! 😊",
+        "Don't count on it ❌", "Signs point to yes! ⭐", "Very doubtful ❓"
+    ]
+    await ctx.send(f"🎱 Question: {question}\nAnswer: {random.choice(responses)}")
+
+# Command: Simple calculator
+@bot.command(name='calc')
+async def calculate(ctx, *, expression):
+    try:
+        # Safe evaluation (only basic math)
+        allowed_chars = set("0123456789+-*/(). ")
+        if all(c in allowed_chars for c in expression):
+            result = eval(expression)
+            await ctx.send(f"🧮 {expression} = **{result}**")
+        else:
+            await ctx.send("❌ Invalid characters! Only use numbers and + - * / ( )")
+    except:
+        await ctx.send("❌ Invalid expression! Example: `!calc 2+2`")
+
 # Command: List all commands (updated)
 @bot.command(name='commands')
 async def show_commands(ctx):
@@ -238,15 +355,24 @@ async def show_commands(ctx):
     
     embed.add_field(
         name="🎬 Auto Features",
-        value="• Automatically detects YouTube videos & channels\n• Creates short links for videos\n• Promotes FIX CORPORATION content",
+        value="• Automatically detects YouTube videos & channels\n• Creates short links for videos\n• Promotes FIX CORPORATION content\n• Type 'Luna' to get subscribe info!",
         inline=False
     )
     
     embed.set_footer(text="Made for FIX CORPORATION • Subscribe for free aimbot!")
     await ctx.send(embed=embed)
 
-# The rest of your existing commands (ping, clear, userinfo, etc.) remain the same
-# ... [keep all your other command functions from previous code] ...
+# Error handling
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("❌ You don't have permission to use this command!")
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing argument! Use `!help {ctx.command.name}`")
+    elif isinstance(error, commands.CommandNotFound):
+        pass  # Ignore unknown commands
+    else:
+        await ctx.send(f"❌ An error occurred: {str(error)}")
 
 # Run the bot
 if __name__ == "__main__":
@@ -255,6 +381,5 @@ if __name__ == "__main__":
         print("❌ Error: DISCORD_TOKEN environment variable not found!")
         print("📝 Please set DISCORD_TOKEN in Render dashboard → Environment tab")
     else:
-        keep_alive()
         print("🚀 Starting bot...")
         bot.run(TOKEN)
