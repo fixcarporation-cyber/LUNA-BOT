@@ -15,7 +15,7 @@ intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # ========== CONFIGURATION ==========
-# Change this to your actual owner role name
+# Role name must match EXACTLY - yours is "owner" (lowercase)
 OWNER_ROLE_NAME = "owner"
 
 def is_owner():
@@ -85,12 +85,12 @@ async def on_message(message):
     if message.author == bot.user:
         return
     
-    # ONLY "Luna" trigger - sends YouTube link
+    # "Luna" trigger
     if 'luna' in message.content.lower():
         await send_subscribe_embed(message.channel, "@FIXCORPORATION")
         return
     
-    # YouTube link shortening (keeps working)
+    # YouTube link shortening
     youtube_pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+'
     youtube_links = re.findall(youtube_pattern, message.content)
     
@@ -117,11 +117,9 @@ async def on_message(message):
             await message.channel.send(embed=embed)
             break
     
-    # NO CHAT RESPONSES - removed all 'hello', 'how are you', etc.
-    
     await bot.process_commands(message)
 
-# ========== MODERATION COMMANDS (OWNER ONLY) ==========
+# ========== MODERATION COMMANDS (OWNER ROLE ONLY) ==========
 @bot.command(name='timeout')
 @is_owner()
 async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, reason: str = "No reason provided"):
@@ -223,6 +221,14 @@ async def unban_member(ctx, *, member_name):
     except Exception as e:
         await ctx.send(f"❌ Error: {str(e)}")
 
+@bot.command(name='clear')
+@is_owner()
+async def clear(ctx, amount=5):
+    if amount > 100:
+        amount = 100
+    await ctx.channel.purge(limit=amount + 1)
+    await ctx.send(f'✅ Deleted {amount} messages!', delete_after=3)
+
 # ========== ADMIN HELP ==========
 @bot.command(name='admin')
 async def admin_commands(ctx):
@@ -230,7 +236,7 @@ async def admin_commands(ctx):
         await ctx.send(f"❌ You need the **{OWNER_ROLE_NAME}** role to view admin commands!")
         return
     embed = discord.Embed(
-        title="🔒 Owner/Admin Commands",
+        title="🔒 Owner Commands",
         description=f"These commands are only available to users with the **{OWNER_ROLE_NAME}** role.",
         color=discord.Color.dark_red()
     )
@@ -257,27 +263,18 @@ async def ping(ctx):
     latency = round(bot.latency * 1000)
     await ctx.send(f'🏓 Pong! Latency: {latency}ms')
 
-@bot.command(name='clear')
-@commands.has_permissions(manage_messages=True)
-async def clear(ctx, amount=5):
-    if amount > 100:
-        amount = 100
-    await ctx.channel.purge(limit=amount + 1)
-    await ctx.send(f'✅ Deleted {amount} messages!', delete_after=3)
-
 @bot.command(name='commands')
 async def show_commands(ctx):
     embed = discord.Embed(title="📋 Available Commands", description="Here's what I can do!", color=discord.Color.green())
     commands_list = {
         "!ping": "Check bot latency",
         "!subscribe": "Get FIX CORPORATION YouTube link",
-        "!admin": "Show admin commands (Owner only)",
+        "!admin": "Show owner commands (owner role only)",
         "!commands": "Show this help menu"
     }
     for cmd, desc in commands_list.items():
         embed.add_field(name=cmd, value=desc, inline=False)
     embed.add_field(name="🎬 Auto Features", value="• Type 'Luna' anywhere to get subscribe link!\n• Automatically shortens YouTube links", inline=False)
-    embed.add_field(name="👑 Owner Commands", value="• !timeout, !kick, !ban, !unban, !clear", inline=False)
     embed.set_footer(text="Made for FIX CORPORATION")
     await ctx.send(embed=embed)
 
