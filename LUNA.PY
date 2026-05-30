@@ -122,7 +122,7 @@ async def on_message(message):
     
     await bot.process_commands(message)
 
-# ========== MODERATION COMMANDS (OWNER ONLY BY USER ID) ==========
+# ========== MODERATION COMMANDS ==========
 @bot.command(name='timeout')
 @is_owner()
 async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, reason: str = "No reason provided"):
@@ -137,7 +137,7 @@ async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, rea
         )
         embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
         embed.add_field(name="Reason", value=reason, inline=True)
-        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+        # Moderator field removed - only shows Duration and Reason
         await ctx.send(embed=embed)
         
         try:
@@ -146,8 +146,6 @@ async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, rea
             pass
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to timeout this member!")
-    except Exception as e:
-        await ctx.send(f"❌ Error: {str(e)}")
 
 @bot.command(name='untimeout')
 @is_owner()
@@ -157,8 +155,6 @@ async def untimeout_member(ctx, member: discord.Member):
         await ctx.send(f"✅ {member.mention} timeout has been removed!")
     except discord.Forbidden:
         await ctx.send("❌ I don't have permission to remove timeout!")
-    except Exception as e:
-        await ctx.send(f"❌ Error: {str(e)}")
 
 @bot.command(name='kick')
 @is_owner()
@@ -223,10 +219,11 @@ async def show_commands(ctx):
     embed = discord.Embed(title="📋 Available Commands", color=discord.Color.green())
     embed.add_field(name="!ping", value="Check bot latency", inline=False)
     embed.add_field(name="!subscribe", value="Get FIX CORPORATION YouTube link", inline=False)
-    embed.add_field(name="!timeout @user [min] [reason]", value="Timeout a member (Owner only)", inline=False)
-    embed.add_field(name="!kick @user [reason]", value="Kick a member (Owner only)", inline=False)
-    embed.add_field(name="!ban @user [reason]", value="Ban a member (Owner only)", inline=False)
-    embed.add_field(name="!clear [amount]", value="Delete messages (Owner only)", inline=False)
+    embed.add_field(name="!timeout @user [min] [reason]", value="Timeout a member", inline=False)
+    embed.add_field(name="!untimeout @user", value="Remove timeout", inline=False)
+    embed.add_field(name="!kick @user [reason]", value="Kick a member", inline=False)
+    embed.add_field(name="!ban @user [reason]", value="Ban a member", inline=False)
+    embed.add_field(name="!clear [amount]", value="Delete messages", inline=False)
     embed.add_field(name="🎬 Auto Features", value="• Type 'Luna' anywhere to get subscribe link!\n• Automatically shortens YouTube links", inline=False)
     embed.set_footer(text="Made for FIX CORPORATION")
     await ctx.send(embed=embed)
@@ -234,21 +231,18 @@ async def show_commands(ctx):
 # ========== ERROR HANDLING ==========
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"❌ Missing argument! Example: `!{ctx.command.name} @user`")
-    elif isinstance(error, commands.CommandNotFound):
+    if isinstance(error, commands.CommandNotFound):
         pass
+    elif isinstance(error, commands.MissingRequiredArgument):
+        await ctx.send(f"❌ Missing argument! Example: `!{ctx.command.name} @user`")
     elif isinstance(error, commands.MemberNotFound):
         await ctx.send("❌ Member not found! Please mention a valid user.")
-    else:
-        await ctx.send(f"❌ Error: {str(error)}")
 
 # ========== BOT STARTUP ==========
 @bot.event
 async def on_ready():
     print(f'✅ {bot.user} is online!')
     print(f'📊 Bot is in {len(bot.guilds)} guilds')
-    print(f'👑 Bot owner user ID: {OWNER_USER_ID}')
     await bot.change_presence(activity=discord.Game(name="Type 'Luna' for YouTube link!"))
 
 # ========== RUN BOT ==========
