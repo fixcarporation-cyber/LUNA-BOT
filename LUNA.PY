@@ -116,28 +116,28 @@ async def on_message(message):
     msg_lower = message.content.lower()
     
     # UPDATED RESPONSES DICTIONARY with "I am fine" responses
-    responses = {
-        'hello': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
-        'hi': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
-        'bye': ['Goodbye! 👋', 'See you later!', 'Take care! 😊'],
-        'how are you': ['I\'m doing great, thanks for asking! 🤖', 'All systems operational! 👍', 'I\'m fantastic! How about you?'],
-        'good': ['That\'s great to hear! 🎉', 'Awesome! 😊', 'Wonderful!'],
-        # ✅ NEW RESPONSES FOR "I am fine"
-        'i am fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
-        'i\'m fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
-        'fine': ['Great! 😊', 'Good to know! 👍', 'Awesome! 😄'],
-        'i am good': ['That\'s wonderful! 🎉', 'So happy to hear that! 😊', 'Excellent! 👍'],
-        # End of new responses
-        'bad': ['Sorry to hear that! 😔 Hope things get better soon!', 'I\'m here if you want to talk! 💬'],
-        'thanks': ['You\'re welcome! 😊', 'My pleasure!', 'Anytime! 👍'],
-        'help': ['Type !commands to see all my commands!', 'How can I help you today?'],
-        'who are you': ['I\'m a Discord bot created with Python! 🤖', 'Your friendly neighborhood bot! 😊'],
-        'joke': [
-            'Why don\'t scientists trust atoms? Because they make up everything! 😂',
-            'What do you call a fake noodle? An impasta! 🍝',
-            'Why did the scarecrow win an award? He was outstanding in his field! 🌾'
-        ]
-    }
+  responses = {
+    'hello': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
+    'hi': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
+    'bye': ['Goodbye! 👋', 'See you later!', 'Take care! 😊'],
+    'how are you': ['I\'m doing great, thanks for asking! 🤖', 'All systems operational! 👍', 'I\'m fantastic! How about you?'],
+    'good': ['That\'s great to hear! 🎉', 'Awesome! 😊', 'Wonderful!'],
+    # ✅ ADD THESE 4 NEW LINES:
+    'i am fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
+    'i\'m fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
+    'fine': ['Great! 😊', 'Good to know! 👍', 'Awesome! 😄'],
+    'i am good': ['That\'s wonderful! 🎉', 'So happy to hear that! 😊', 'Excellent! 👍'],
+    # End of new lines
+    'bad': ['Sorry to hear that! 😔 Hope things get better soon!', 'I\'m here if you want to talk! 💬'],
+    'thanks': ['You\'re welcome! 😊', 'My pleasure!', 'Anytime! 👍'],
+    'help': ['Type !commands to see all my commands!', 'How can I help you today?'],
+    'who are you': ['I\'m a Discord bot created with Python! 🤖', 'Your friendly neighborhood bot! 😊'],
+    'joke': [
+        'Why don\'t scientists trust atoms? Because they make up everything! 😂',
+        'What do you call a fake noodle? An impasta! 🍝',
+        'Why did the scarecrow win an award? He was outstanding in his field! 🌾'
+    ]
+}
     
     for keyword, response_list in responses.items():
         if keyword in msg_lower:
