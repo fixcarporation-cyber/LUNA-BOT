@@ -2,7 +2,7 @@ import discord
 from discord.ext import commands
 import random
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import re
 import aiohttp
@@ -11,9 +11,30 @@ import aiohttp
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
+intents.moderations = True  # Required for timeout feature
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+# ========== CONFIGURATION ==========
+# Change this to your actual owner role name
+OWNER_ROLE_NAME = "Owner"  # ← CHANGE THIS TO YOUR ROLE NAME
+
+def is_owner():
+    """Check if user has owner role"""
+    async def predicate(ctx):
+        role = discord.utils.get(ctx.author.roles, name=OWNER_ROLE_NAME)
+        if role is None:
+            await ctx.send(f"❌ You don't have permission! You need the **{OWNER_ROLE_NAME}** role to use this command.")
+            return False
+        return True
+    return commands.check(predicate)
+
+# Function to check if user is owner
+def check_owner_role(member):
+    """Returns True if member has owner role"""
+    return any(role.name == OWNER_ROLE_NAME for role in member.roles)
+
+# ========== YOUTUBE FUNCTIONS ==========
 # Function to handle YouTube channel links
 async def process_youtube_channel(url):
     """
@@ -57,7 +78,7 @@ async def shorten_youtube_link(url):
     
     return None
 
-# Function to send subscribe embed (reused for both !subscribe and "Luna" trigger)
+# Function to send subscribe embed
 async def send_subscribe_embed(channel, channel_handle="@FIXCORPORATION"):
     """Send the subscribe embed message"""
     embed = discord.Embed(
@@ -72,7 +93,7 @@ async def send_subscribe_embed(channel, channel_handle="@FIXCORPORATION"):
     
     await channel.send(embed=embed)
 
-# Main on_message event with channel support
+# ========== MAIN ON_MESSAGE EVENT ==========
 @bot.event
 async def on_message(message):
     if message.author == bot.user:
@@ -81,14 +102,13 @@ async def on_message(message):
     # Check for "Luna" in message (case insensitive)
     if 'luna' in message.content.lower():
         await send_subscribe_embed(message.channel, "@FIXCORPORATION")
-        return  # Stop here so it doesn't process other responses
+        return
     
     # Check for YouTube links
     youtube_pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+'
     youtube_links = re.findall(youtube_pattern, message.content)
     
     for link in youtube_links:
-        # Check if it's a channel link first
         channel_info = await process_youtube_channel(link)
         if channel_info:
             embed = discord.Embed(
@@ -101,7 +121,6 @@ async def on_message(message):
             await message.channel.send(embed=embed)
             break
         
-        # If not a channel, try video shortening
         short_link = await shorten_youtube_link(link)
         if short_link:
             embed = discord.Embed(
@@ -112,10 +131,9 @@ async def on_message(message):
             await message.channel.send(embed=embed)
             break
     
-    # Rest of your existing on_message logic
+    # Chat responses
     msg_lower = message.content.lower()
     
-    # ✅ FIXED: Properly indented responses dictionary
     responses = {
         'hello': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
         'hi': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
@@ -145,28 +163,241 @@ async def on_message(message):
     
     await bot.process_commands(message)
 
+# ========== MODERATION COMMANDS (OWNER ONLY) ==========
+
+# Command: Timeout a member (Owner only)
+@bot.command(name='timeout')
+@is_owner()
+async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, reason: str = "No reason provided"):
+    """
+    Timeout a member for specified minutes.
+    Usage: !timeout @user [minutes] [reason]
+    Example: !timeout @user 5 Spamming
+    """
+    try:
+        # Convert minutes to timedelta
+        timeout_duration = timedelta(minutes=duration)
+        
+        await member.timeout(timeout_duration, reason=reason)
+        
+        embed = discord.Embed(
+            title="⏰ Member Timed Out",
+            description=f"{member.mention} has been timed out!",
+            color=discord.Color.orange()
+        )
+        embed.add_field(name="Duration", value=f"{duration} minutes", inline=True)
+        embed.add_field(name="Reason", value=reason, inline=True)
+        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+        await ctx.send(embed=embed)
+        
+        # DM the user
+        try:
+            await member.send(f"⚠️ You have been timed out in **{ctx.guild.name}** for {duration} minutes.\nReason: {reason}")
+        except:
+            pass
+            
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to timeout this member!")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
+
+# Command: Remove timeout from a member (Owner only)
+@bot.command(name='untimeout')
+@is_owner()
+async def untimeout_member(ctx, member: discord.Member):
+    """Remove timeout from a member. Usage: !untimeout @user"""
+    try:
+        await member.timeout(None)
+        await ctx.send(f"✅ {member.mention} timeout has been removed!")
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to remove timeout from this member!")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
+
+# Command: Kick a member (Owner only)
+@bot.command(name='kick')
+@is_owner()
+async def kick_member(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+    """
+    Kick a member from the server.
+    Usage: !kick @user [reason]
+    Example: !kick @user Breaking rules
+    """
+    if member == ctx.author:
+        await ctx.send("❌ You cannot kick yourself!")
+        return
+    
+    if member.guild_permissions.administrator:
+        await ctx.send("❌ You cannot kick an administrator!")
+        return
+    
+    try:
+        embed = discord.Embed(
+            title="👢 Member Kicked",
+            description=f"{member.mention} has been kicked!",
+            color=discord.Color.red()
+        )
+        embed.add_field(name="Reason", value=reason, inline=True)
+        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+        
+        await member.kick(reason=reason)
+        await ctx.send(embed=embed)
+        
+        # DM the user
+        try:
+            await member.send(f"⚠️ You have been kicked from **{ctx.guild.name}**.\nReason: {reason}")
+        except:
+            pass
+            
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to kick this member!")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
+
+# Command: Ban a member (Owner only)
+@bot.command(name='ban')
+@is_owner()
+async def ban_member(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+    """
+    Ban a member from the server.
+    Usage: !ban @user [reason]
+    Example: !ban @user Harassment
+    """
+    if member == ctx.author:
+        await ctx.send("❌ You cannot ban yourself!")
+        return
+    
+    if member.guild_permissions.administrator:
+        await ctx.send("❌ You cannot ban an administrator!")
+        return
+    
+    try:
+        embed = discord.Embed(
+            title="🔨 Member Banned",
+            description=f"{member.mention} has been banned!",
+            color=discord.Color.dark_red()
+        )
+        embed.add_field(name="Reason", value=reason, inline=True)
+        embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+        
+        await member.ban(reason=reason)
+        await ctx.send(embed=embed)
+        
+    except discord.Forbidden:
+        await ctx.send("❌ I don't have permission to ban this member!")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
+
+# Command: Unban a member (Owner only)
+@bot.command(name='unban')
+@is_owner()
+async def unban_member(ctx, *, member_name):
+    """
+    Unban a member by name.
+    Usage: !unban username#1234
+    """
+    try:
+        banned_users = [entry async for entry in ctx.guild.bans()]
+        member_name_split = member_name.split('#')
+        
+        for ban_entry in banned_users:
+            user = ban_entry.user
+            if user.name == member_name_split[0] and (len(member_name_split) == 1 or user.discriminator == member_name_split[1]):
+                await ctx.guild.unban(user)
+                await ctx.send(f"✅ Unbanned {user.mention}")
+                return
+        
+        await ctx.send(f"❌ Could not find banned user: {member_name}")
+    except Exception as e:
+        await ctx.send(f"❌ Error: {str(e)}")
+
+# Command: Warn a member (Owner only)
+@bot.command(name='warn')
+@is_owner()
+async def warn_member(ctx, member: discord.Member, *, reason: str = "No reason provided"):
+    """Warn a member. Usage: !warn @user [reason]"""
+    embed = discord.Embed(
+        title="⚠️ Member Warned",
+        description=f"{member.mention} has been warned!",
+        color=discord.Color.yellow()
+    )
+    embed.add_field(name="Reason", value=reason, inline=True)
+    embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
+    
+    await ctx.send(embed=embed)
+    
+    # DM the user
+    try:
+        await member.send(f"⚠️ You have been warned in **{ctx.guild.name}**.\nReason: {reason}")
+    except:
+        pass
+
+# Command: View warnings (placeholder - would need database for persistence)
+@bot.command(name='warnings')
+@is_owner()
+async def view_warnings(ctx, member: discord.Member):
+    """View warnings for a member (Simple version without DB)"""
+    embed = discord.Embed(
+        title="📋 Warnings System",
+        description="⚠️ Warning tracking requires a database setup.\nUse `!warn @user` to issue warnings.",
+        color=discord.Color.blue()
+    )
+    embed.add_field(name="Note", value="For persistent warnings across bot restarts, a database is needed.", inline=False)
+    await ctx.send(embed=embed)
+
+# ========== ADMIN HELP COMMAND ==========
+@bot.command(name='admin')
+async def admin_commands(ctx):
+    """Show admin/moderation commands"""
+    # Check if user has owner role
+    if not check_owner_role(ctx.author):
+        await ctx.send(f"❌ You need the **{OWNER_ROLE_NAME}** role to view admin commands!")
+        return
+    
+    embed = discord.Embed(
+        title="🔒 Owner/Admin Commands",
+        description=f"These commands are only available to users with the **{OWNER_ROLE_NAME}** role.",
+        color=discord.Color.dark_red()
+    )
+    
+    admin_commands_list = {
+        "!timeout @user [min] [reason]": "Timeout a member (default: 60 min)",
+        "!untimeout @user": "Remove timeout from a member",
+        "!kick @user [reason]": "Kick a member from the server",
+        "!ban @user [reason]": "Ban a member from the server",
+        "!unban username#1234": "Unban a member by name",
+        "!warn @user [reason]": "Warn a member",
+        "!clear [amount]": "Delete messages (Admin only)"
+    }
+    
+    for cmd, desc in admin_commands_list.items():
+        embed.add_field(name=cmd, value=desc, inline=False)
+    
+    embed.set_footer(text="Use these commands responsibly!")
+    await ctx.send(embed=embed)
+
+# ========== REGULAR COMMANDS ==========
 # Command: Get channel info
 @bot.command(name='channel')
 async def channel_info(ctx, *, handle_or_url):
     """Get information about a YouTube channel"""
-    # Check if it's a handle or URL
     if not handle_or_url.startswith('http'):
         handle_or_url = f"https://youtube.com/@{handle_or_url.replace('@', '')}"
     
-    channel_info = await process_youtube_channel(handle_or_url)
-    if channel_info:
+    channel_info_data = await process_youtube_channel(handle_or_url)
+    if channel_info_data:
         embed = discord.Embed(
             title="📺 YouTube Channel Information",
-            description=f"**Channel Handle:** {channel_info['handle']}",
+            description=f"**Channel Handle:** {channel_info_data['handle']}",
             color=discord.Color.purple()
         )
-        embed.add_field(name="Channel URL", value=channel_info['clean_url'], inline=False)
+        embed.add_field(name="Channel URL", value=channel_info_data['clean_url'], inline=False)
         embed.add_field(name="💡 Pro Tip", value="Use `!subscribe` to get a reminder!", inline=False)
         await ctx.send(embed=embed)
     else:
         await ctx.send("❌ Invalid YouTube channel link! Use format: `@channelname` or full URL")
 
-# Command: Subscribe reminder for your channel
+# Command: Subscribe reminder
 @bot.command(name='subscribe')
 async def subscribe_reminder(ctx, channel_handle=None):
     """Get reminder to subscribe to FIX CORPORATION"""
@@ -192,7 +423,7 @@ async def promote_channel(ctx):
     
     await ctx.send(embed=embed)
 
-# Command: Video info (existing)
+# Command: Video info
 @bot.command(name='ytinfo')
 async def youtube_info(ctx, *, url):
     """Get information about a YouTube video"""
@@ -223,18 +454,18 @@ async def youtube_info(ctx, *, url):
     embed.add_field(name="💡 Tip", value="Check out FIX CORPORATION for more content!", inline=False)
     await ctx.send(embed=embed)
 
-# Command: Ping - Check bot latency
+# Command: Ping
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
     await ctx.send(f'🏓 Pong! Latency: {latency}ms')
 
-# Command: Echo - Repeat user message
+# Command: Echo
 @bot.command(name='echo')
 async def echo(ctx, *, message):
     await ctx.send(message)
 
-# Command: Clear messages (admin only)
+# Command: Clear messages (admin only - using discord permissions)
 @bot.command(name='clear')
 @commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount=5):
@@ -306,21 +537,20 @@ async def serverinfo(ctx):
     
     await ctx.send(embed=embed)
 
-# Command: 8ball - Ask a question
+# Command: 8ball
 @bot.command(name='8ball')
 async def eight_ball(ctx, *, question):
-    responses = [
+    responses_list = [
         "Yes! 🎯", "No ❌", "Maybe 🤔", "Definitely! ✅", 
         "Ask again later 🔮", "Not likely ❎", "Of course! 😊",
         "Don't count on it ❌", "Signs point to yes! ⭐", "Very doubtful ❓"
     ]
-    await ctx.send(f"🎱 Question: {question}\nAnswer: {random.choice(responses)}")
+    await ctx.send(f"🎱 Question: {question}\nAnswer: {random.choice(responses_list)}")
 
 # Command: Simple calculator
 @bot.command(name='calc')
 async def calculate(ctx, *, expression):
     try:
-        # Safe evaluation (only basic math)
         allowed_chars = set("0123456789+-*/(). ")
         if all(c in allowed_chars for c in expression):
             result = eval(expression)
@@ -330,7 +560,7 @@ async def calculate(ctx, *, expression):
     except:
         await ctx.send("❌ Invalid expression! Example: `!calc 2+2`")
 
-# Command: List all commands (updated)
+# Command: List all commands
 @bot.command(name='commands')
 async def show_commands(ctx):
     embed = discord.Embed(
@@ -342,7 +572,6 @@ async def show_commands(ctx):
     commands_list = {
         "!ping": "Check bot latency",
         "!echo <message>": "Repeat your message",
-        "!clear <amount>": "Delete messages (Admin only)",
         "!userinfo [@user]": "Get user information",
         "!serverinfo": "Get server information",
         "!roll <XdY>": "Roll dice (e.g., 2d20)",
@@ -352,6 +581,7 @@ async def show_commands(ctx):
         "!subscribe": "Get reminder to subscribe to FIX CORPORATION",
         "!promote": "Promote the FIX CORPORATION channel",
         "!ytinfo <url>": "Get YouTube video information",
+        "!admin": "Show admin/moderation commands (Owner only)",
         "!commands": "Show this help menu"
     }
     
@@ -367,7 +597,7 @@ async def show_commands(ctx):
     embed.set_footer(text="Made for FIX CORPORATION • Subscribe for free aimbot!")
     await ctx.send(embed=embed)
 
-# Error handling
+# ========== ERROR HANDLING ==========
 @bot.event
 async def on_command_error(ctx, error):
     if isinstance(error, commands.MissingPermissions):
@@ -375,11 +605,25 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.MissingRequiredArgument):
         await ctx.send(f"❌ Missing argument! Use `!help {ctx.command.name}`")
     elif isinstance(error, commands.CommandNotFound):
-        pass  # Ignore unknown commands
+        pass
+    elif isinstance(error, commands.MemberNotFound):
+        await ctx.send("❌ Member not found! Please mention a valid user.")
+    elif isinstance(error, commands.BadArgument):
+        await ctx.send("❌ Invalid argument! Please check the command format.")
     else:
         await ctx.send(f"❌ An error occurred: {str(error)}")
 
-# Run the bot
+# ========== BOT STARTUP ==========
+@bot.event
+async def on_ready():
+    print(f'✅ {bot.user} is online!')
+    print(f'📊 Bot is in {len(bot.guilds)} guilds')
+    print(f'👑 Owner role name: {OWNER_ROLE_NAME}')
+    
+    # Set bot status
+    await bot.change_presence(activity=discord.Game(name="!commands | Type Luna for subscribe!"))
+
+# ========== RUN BOT ==========
 if __name__ == "__main__":
     TOKEN = os.getenv('DISCORD_TOKEN')
     if not TOKEN:
