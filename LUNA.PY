@@ -142,7 +142,7 @@ async def channel_info(ctx, *, handle_or_url):
         await ctx.send("❌ Invalid YouTube channel link! Use format: `@channelname` or full URL")
 
 # Command: Subscribe reminder for your channel
-@bot.command(name='Luna give me youtube link')
+@bot.command(name='subscribe')
 async def subscribe_reminder(ctx, channel_handle=None):
     """Get reminder to subscribe to FIX CORPORATION"""
     if not channel_handle:
