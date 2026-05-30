@@ -120,7 +120,7 @@ responses = {
     'hello': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
     'hi': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
     'bye': ['Goodbye! 👋', 'See you later!', 'Take care! 😊'],
-    'how are you': ['I\'m doing great, thanks for asking! 🤖', 'I'm fantastic! How about you?', 'I\'m fantastic! How about you?'],
+    'how are you': ['I\'m doing great, thanks for asking! 🤖', 'I\'m fantastic! How about you?', 'I\'m fantastic! How about you?'],
     'good': ['That\'s great to hear! 🎉', 'Awesome! 😊', 'Wonderful!'],
     # ✅ ADD THESE 4 NEW LINES:
     'i am fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
