@@ -251,10 +251,9 @@ async def show_commands(ctx):
 # Run the bot
 if __name__ == "__main__":
     TOKEN = os.getenv('DISCORD_TOKEN')
-    
     if not TOKEN:
         print("❌ Error: DISCORD_TOKEN environment variable not found!")
-        print("Please set your bot token in Railway's environment variables.")
+        print("📝 Please set DISCORD_TOKEN in Render dashboard → Environment tab")
     else:
-        print("✅ Bot token found! Starting bot...")
+        print("🚀 Starting bot...")
         bot.run(TOKEN)
