@@ -16,7 +16,7 @@ bot = commands.Bot(command_prefix='!', intents=intents)
 
 # ========== CONFIGURATION ==========
 # Change this to your actual owner role name
-OWNER_ROLE_NAME = "Owner"
+OWNER_ROLE_NAME = "owner"
 
 def is_owner():
     """Check if user has owner role"""
@@ -85,10 +85,12 @@ async def on_message(message):
     if message.author == bot.user:
         return
     
+    # ONLY "Luna" trigger - sends YouTube link
     if 'luna' in message.content.lower():
         await send_subscribe_embed(message.channel, "@FIXCORPORATION")
         return
     
+    # YouTube link shortening (keeps working)
     youtube_pattern = r'(?:https?://)?(?:www\.)?(?:youtube\.com|youtu\.be)/\S+'
     youtube_links = re.findall(youtube_pattern, message.content)
     
@@ -115,38 +117,11 @@ async def on_message(message):
             await message.channel.send(embed=embed)
             break
     
-    msg_lower = message.content.lower()
-    
-    responses = {
-        'hello': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
-        'hi': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
-        'bye': ['Goodbye! 👋', 'See you later!', 'Take care! 😊'],
-        'how are you': ['I\'m fantastic! How about you?'],
-        'good': ['That\'s great to hear! 🎉', 'Awesome! 😊', 'Wonderful!'],
-        'i am fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
-        'i\'m fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
-        'fine': ['Great! 😊', 'Good to know! 👍', 'Awesome! 😄'],
-        'i am good': ['That\'s wonderful! 🎉', 'So happy to hear that! 😊', 'Excellent! 👍'],
-        'bad': ['Sorry to hear that! 😔 Hope things get better soon!', 'I\'m here if you want to talk! 💬'],
-        'thanks': ['You\'re welcome! 😊', 'My pleasure!', 'Anytime! 👍'],
-        'help': ['Type !commands to see all my commands!', 'How can I help you today?'],
-        'who are you': ['I\'m a Discord bot created with Python! 🤖', 'Your friendly neighborhood bot! 😊'],
-        'joke': [
-            'Why don\'t scientists trust atoms? Because they make up everything! 😂',
-            'What do you call a fake noodle? An impasta! 🍝',
-            'Why did the scarecrow win an award? He was outstanding in his field! 🌾'
-        ]
-    }
-    
-    for keyword, response_list in responses.items():
-        if keyword in msg_lower:
-            response = random.choice(response_list)
-            await message.channel.send(response)
-            break
+    # NO CHAT RESPONSES - removed all 'hello', 'how are you', etc.
     
     await bot.process_commands(message)
 
-# ========== MODERATION COMMANDS ==========
+# ========== MODERATION COMMANDS (OWNER ONLY) ==========
 @bot.command(name='timeout')
 @is_owner()
 async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, reason: str = "No reason provided"):
@@ -248,22 +223,6 @@ async def unban_member(ctx, *, member_name):
     except Exception as e:
         await ctx.send(f"❌ Error: {str(e)}")
 
-@bot.command(name='warn')
-@is_owner()
-async def warn_member(ctx, member: discord.Member, *, reason: str = "No reason provided"):
-    embed = discord.Embed(
-        title="⚠️ Member Warned",
-        description=f"{member.mention} has been warned!",
-        color=discord.Color.yellow()
-    )
-    embed.add_field(name="Reason", value=reason, inline=True)
-    embed.add_field(name="Moderator", value=ctx.author.mention, inline=True)
-    await ctx.send(embed=embed)
-    try:
-        await member.send(f"⚠️ You have been warned in **{ctx.guild.name}**.\nReason: {reason}")
-    except:
-        pass
-
 # ========== ADMIN HELP ==========
 @bot.command(name='admin')
 async def admin_commands(ctx):
@@ -281,7 +240,6 @@ async def admin_commands(ctx):
         "!kick @user [reason]": "Kick a member",
         "!ban @user [reason]": "Ban a member",
         "!unban username#1234": "Unban a member",
-        "!warn @user [reason]": "Warn a member",
         "!clear [amount]": "Delete messages"
     }
     for cmd, desc in admin_commands_list.items():
@@ -290,66 +248,14 @@ async def admin_commands(ctx):
     await ctx.send(embed=embed)
 
 # ========== REGULAR COMMANDS ==========
-@bot.command(name='channel')
-async def channel_info(ctx, *, handle_or_url):
-    if not handle_or_url.startswith('http'):
-        handle_or_url = f"https://youtube.com/@{handle_or_url.replace('@', '')}"
-    channel_info_data = await process_youtube_channel(handle_or_url)
-    if channel_info_data:
-        embed = discord.Embed(
-            title="📺 YouTube Channel Information",
-            description=f"**Channel Handle:** {channel_info_data['handle']}",
-            color=discord.Color.purple()
-        )
-        embed.add_field(name="Channel URL", value=channel_info_data['clean_url'], inline=False)
-        await ctx.send(embed=embed)
-    else:
-        await ctx.send("❌ Invalid YouTube channel link!")
-
 @bot.command(name='subscribe')
-async def subscribe_reminder(ctx, channel_handle=None):
-    if not channel_handle:
-        channel_handle = "@FIXCORPORATION"
-    await send_subscribe_embed(ctx.channel, channel_handle)
-
-@bot.command(name='promote')
-async def promote_channel(ctx):
-    embed = discord.Embed(
-        title="🚀 Check Out FIX CORPORATION!",
-        description="**Your source for gaming content and tools!**",
-        color=discord.Color.blue(),
-        url="https://youtube.com/@FIXCORPORATION"
-    )
-    embed.add_field(name="🎮 Content", value="• Gaming tutorials\n• Aimbot panels\n• Safe tools", inline=True)
-    embed.add_field(name="📈 Growth", value="95+ subscribers\n15+ videos", inline=True)
-    embed.add_field(name="🔗 Link", value="https://youtube.com/@FIXCORPORATION", inline=False)
-    await ctx.send(embed=embed)
-
-@bot.command(name='ytinfo')
-async def youtube_info(ctx, *, url):
-    video_id = None
-    patterns = [r'v=([a-zA-Z0-9_-]+)', r'youtu\.be/([a-zA-Z0-9_-]+)', r'shorts/([a-zA-Z0-9_-]+)']
-    for pattern in patterns:
-        match = re.search(pattern, url)
-        if match:
-            video_id = match.group(1)
-            break
-    if not video_id:
-        await ctx.send("❌ Could not extract video ID!")
-        return
-    short_link = f"https://youtu.be/{video_id}"
-    embed = discord.Embed(title="📹 YouTube Video Info", color=discord.Color.red())
-    embed.add_field(name="Short Link", value=short_link, inline=False)
-    await ctx.send(embed=embed)
+async def subscribe_reminder(ctx):
+    await send_subscribe_embed(ctx.channel, "@FIXCORPORATION")
 
 @bot.command(name='ping')
 async def ping(ctx):
     latency = round(bot.latency * 1000)
     await ctx.send(f'🏓 Pong! Latency: {latency}ms')
-
-@bot.command(name='echo')
-async def echo(ctx, *, message):
-    await ctx.send(message)
 
 @bot.command(name='clear')
 @commands.has_permissions(manage_messages=True)
@@ -359,80 +265,19 @@ async def clear(ctx, amount=5):
     await ctx.channel.purge(limit=amount + 1)
     await ctx.send(f'✅ Deleted {amount} messages!', delete_after=3)
 
-@bot.command(name='userinfo')
-async def userinfo(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    embed = discord.Embed(title=f"User Info: {member.name}", color=member.color, timestamp=datetime.now())
-    embed.add_field(name="ID", value=member.id, inline=True)
-    embed.add_field(name="Joined Discord", value=member.created_at.strftime("%Y-%m-%d"), inline=True)
-    embed.add_field(name="Joined Server", value=member.joined_at.strftime("%Y-%m-%d"), inline=True)
-    embed.add_field(name="Top Role", value=member.top_role.mention, inline=True)
-    embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
-    await ctx.send(embed=embed)
-
-@bot.command(name='roll')
-async def roll(ctx, dice: str = "1d6"):
-    try:
-        rolls, limit = map(int, dice.split('d'))
-        if rolls > 100:
-            await ctx.send("❌ Too many rolls!")
-            return
-        if limit > 1000:
-            await ctx.send("❌ Dice too big!")
-            return
-        results = [random.randint(1, limit) for _ in range(rolls)]
-        total = sum(results)
-        if rolls == 1:
-            await ctx.send(f"🎲 You rolled: **{total}**")
-        else:
-            await ctx.send(f"🎲 Rolls: {results}\nTotal: **{total}**")
-    except:
-        await ctx.send("❌ Invalid format! Use: `!roll 2d20`")
-
-@bot.command(name='serverinfo')
-async def serverinfo(ctx):
-    guild = ctx.guild
-    embed = discord.Embed(title=f"Server Info: {guild.name}", color=discord.Color.blue(), timestamp=datetime.now())
-    embed.add_field(name="Owner", value=guild.owner.mention, inline=True)
-    embed.add_field(name="Members", value=guild.member_count, inline=True)
-    embed.add_field(name="Channels", value=len(guild.channels), inline=True)
-    embed.add_field(name="Roles", value=len(guild.roles), inline=True)
-    if guild.icon:
-        embed.set_thumbnail(url=guild.icon.url)
-    await ctx.send(embed=embed)
-
-@bot.command(name='8ball')
-async def eight_ball(ctx, *, question):
-    responses_list = [
-        "Yes! 🎯", "No ❌", "Maybe 🤔", "Definitely! ✅",
-        "Ask again later 🔮", "Not likely ❎", "Of course! 😊"
-    ]
-    await ctx.send(f"🎱 Question: {question}\nAnswer: {random.choice(responses_list)}")
-
-@bot.command(name='calc')
-async def calculate(ctx, *, expression):
-    try:
-        allowed_chars = set("0123456789+-*/(). ")
-        if all(c in allowed_chars for c in expression):
-            result = eval(expression)
-            await ctx.send(f"🧮 {expression} = **{result}**")
-        else:
-            await ctx.send("❌ Invalid characters!")
-    except:
-        await ctx.send("❌ Invalid expression!")
-
 @bot.command(name='commands')
 async def show_commands(ctx):
     embed = discord.Embed(title="📋 Available Commands", description="Here's what I can do!", color=discord.Color.green())
     commands_list = {
         "!ping": "Check bot latency",
-        "!subscribe": "Get FIX CORPORATION info",
-        "!commands": "Show this help menu",
-        "!admin": "Show admin commands (Owner only)"
+        "!subscribe": "Get FIX CORPORATION YouTube link",
+        "!admin": "Show admin commands (Owner only)",
+        "!commands": "Show this help menu"
     }
     for cmd, desc in commands_list.items():
         embed.add_field(name=cmd, value=desc, inline=False)
-    embed.add_field(name="🎬 Auto Features", value="• Type 'Luna' to get subscribe info!\n• Shortens YouTube links", inline=False)
+    embed.add_field(name="🎬 Auto Features", value="• Type 'Luna' anywhere to get subscribe link!\n• Automatically shortens YouTube links", inline=False)
+    embed.add_field(name="👑 Owner Commands", value="• !timeout, !kick, !ban, !unban, !clear", inline=False)
     embed.set_footer(text="Made for FIX CORPORATION")
     await ctx.send(embed=embed)
 
@@ -455,7 +300,7 @@ async def on_command_error(ctx, error):
 async def on_ready():
     print(f'✅ {bot.user} is online!')
     print(f'📊 Bot is in {len(bot.guilds)} guilds')
-    await bot.change_presence(activity=discord.Game(name="Welcome to Fixcorporation"))
+    await bot.change_presence(activity=discord.Game(name="Type 'Luna' for YouTube link!"))
 
 # ========== RUN BOT ==========
 if __name__ == "__main__":
