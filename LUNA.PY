@@ -11,7 +11,7 @@ import aiohttp
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.moderations = True  # Required for timeout feature
+intents.moderations = True  # ✅ FIXED - changed from 'moderation' to 'moderations'
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
@@ -331,19 +331,6 @@ async def warn_member(ctx, member: discord.Member, *, reason: str = "No reason p
         await member.send(f"⚠️ You have been warned in **{ctx.guild.name}**.\nReason: {reason}")
     except:
         pass
-
-# Command: View warnings (placeholder - would need database for persistence)
-@bot.command(name='warnings')
-@is_owner()
-async def view_warnings(ctx, member: discord.Member):
-    """View warnings for a member (Simple version without DB)"""
-    embed = discord.Embed(
-        title="📋 Warnings System",
-        description="⚠️ Warning tracking requires a database setup.\nUse `!warn @user` to issue warnings.",
-        color=discord.Color.blue()
-    )
-    embed.add_field(name="Note", value="For persistent warnings across bot restarts, a database is needed.", inline=False)
-    await ctx.send(embed=embed)
 
 # ========== ADMIN HELP COMMAND ==========
 @bot.command(name='admin')
