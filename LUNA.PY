@@ -9,16 +9,13 @@ import aiohttp
 from flask import Flask
 from threading import Thread
 
-# Flask web server for Render
+# Flask web server
 app = Flask('')
-
 @app.route('/')
 def home():
-    return "✅ Luna Bot is alive and running!"
-
+    return "✅ Luna Bot is alive!"
 def run():
     app.run(host='0.0.0.0', port=8080)
-
 def keep_alive():
     t = Thread(target=run)
     t.start()
@@ -27,23 +24,24 @@ def keep_alive():
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 # ========== CONFIGURATION ==========
-OWNER_ROLE_NAME = "owner"
+# PUT YOUR DISCORD USER ID HERE (Right-click your name → Copy User ID)
+OWNER_USER_ID = 1232243863423418432  # ⚠️ REPLACE THIS WITH YOUR ACTUAL USER ID!
 
 def is_owner():
+    """Check if user is the bot owner by user ID"""
     async def predicate(ctx):
-        role = discord.utils.get(ctx.author.roles, name=OWNER_ROLE_NAME)
-        if role is None:
-            await ctx.send(f"❌ You don't have permission! You need the **{OWNER_ROLE_NAME}** role to use this command.")
+        if ctx.author.id != OWNER_USER_ID:
+            await ctx.send(f"❌ You don't have permission! Only the bot owner can use this command.")
             return False
         return True
     return commands.check(predicate)
 
 def check_owner_role(member):
-    return any(role.name == OWNER_ROLE_NAME for role in member.roles)
+    """Returns True if member is the bot owner"""
+    return member.id == OWNER_USER_ID
 
 # ========== YOUTUBE FUNCTIONS ==========
 async def process_youtube_channel(url):
@@ -127,7 +125,7 @@ async def on_message(message):
     
     await bot.process_commands(message)
 
-# ========== MODERATION COMMANDS ==========
+# ========== MODERATION COMMANDS (OWNER ONLY BY USER ID) ==========
 @bot.command(name='timeout')
 @is_owner()
 async def timeout_member(ctx, member: discord.Member, duration: int = 60, *, reason: str = "No reason provided"):
@@ -210,8 +208,8 @@ async def ping(ctx):
 
 @bot.command(name='admin')
 async def admin_commands(ctx):
-    if not check_owner_role(ctx.author):
-        await ctx.send(f"❌ You need the **{OWNER_ROLE_NAME}** role to view admin commands!")
+    if ctx.author.id != OWNER_USER_ID:
+        await ctx.send(f"❌ Only the bot owner can view admin commands!")
         return
     embed = discord.Embed(title="🔒 Owner Commands", color=discord.Color.dark_red())
     embed.add_field(name="!timeout @user [min] [reason]", value="Timeout a member", inline=False)
@@ -249,6 +247,7 @@ async def on_command_error(ctx, error):
 async def on_ready():
     print(f'✅ {bot.user} is online!')
     print(f'📊 Bot is in {len(bot.guilds)} guilds')
+    print(f'👑 Bot owner user ID: {OWNER_USER_ID}')
     await bot.change_presence(activity=discord.Game(name="Type 'Luna' for YouTube link!"))
 
 # ========== RUN BOT ==========
@@ -257,6 +256,6 @@ if __name__ == "__main__":
     if not TOKEN:
         print("❌ Error: DISCORD_TOKEN environment variable not found!")
     else:
-        keep_alive()  # Start web server for Render
+        keep_alive()
         print("🚀 Starting bot...")
         bot.run(TOKEN)
