@@ -78,7 +78,7 @@ async def on_message(message):
     if message.author == bot.user:
         return
     
-    # ✅ NEW: Check for "Luna" in message (case insensitive)
+    # Check for "Luna" in message (case insensitive)
     if 'luna' in message.content.lower():
         await send_subscribe_embed(message.channel, "@FIXCORPORATION")
         return  # Stop here so it doesn't process other responses
@@ -115,12 +115,19 @@ async def on_message(message):
     # Rest of your existing on_message logic
     msg_lower = message.content.lower()
     
+    # UPDATED RESPONSES DICTIONARY with "I am fine" responses
     responses = {
         'hello': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
         'hi': ['Hello! 👋', 'Hi there! 😊', 'Hey! How are you?'],
         'bye': ['Goodbye! 👋', 'See you later!', 'Take care! 😊'],
         'how are you': ['I\'m doing great, thanks for asking! 🤖', 'All systems operational! 👍', 'I\'m fantastic! How about you?'],
         'good': ['That\'s great to hear! 🎉', 'Awesome! 😊', 'Wonderful!'],
+        # ✅ NEW RESPONSES FOR "I am fine"
+        'i am fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
+        'i\'m fine': ['That\'s good to hear! 😊', 'Glad you\'re doing well! 👍', 'Awesome! Keep smiling! 😄'],
+        'fine': ['Great! 😊', 'Good to know! 👍', 'Awesome! 😄'],
+        'i am good': ['That\'s wonderful! 🎉', 'So happy to hear that! 😊', 'Excellent! 👍'],
+        # End of new responses
         'bad': ['Sorry to hear that! 😔 Hope things get better soon!', 'I\'m here if you want to talk! 💬'],
         'thanks': ['You\'re welcome! 😊', 'My pleasure!', 'Anytime! 👍'],
         'help': ['Type !commands to see all my commands!', 'How can I help you today?'],
