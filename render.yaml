@@ -1,6 +1,6 @@
 services:
-  - type: web  # ✅ Allowed on free plan
-    name: fix-corporation-bot
+  - type: web
+    name: luna-bot
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
