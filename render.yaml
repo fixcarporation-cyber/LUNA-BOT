@@ -4,7 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: python LUNA.PY
+    startCommand: python bot.py
     envVars:
       - key: DISCORD_TOKEN
-        sync: false
+        sync: false  # You'll set this in Render dashboard
