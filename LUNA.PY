@@ -11,7 +11,7 @@ import aiohttp
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-intents.moderations = True  # ✅ FIXED - changed from 'moderation' to 'moderations'
+
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
