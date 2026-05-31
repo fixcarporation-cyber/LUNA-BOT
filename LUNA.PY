@@ -243,7 +243,7 @@ async def on_command_error(ctx, error):
 async def on_ready():
     print(f'✅ {bot.user} is online!')
     print(f'📊 Bot is in {len(bot.guilds)} guilds')
-    await bot.change_presence(activity=discord.Game(name="Type 'Luna' for YouTube link!"))
+    await bot.change_presence(activity=discord.Game(name="WELCOME TO FIXCORPORATION"))
 
 # ========== RUN BOT ==========
 if __name__ == "__main__":
